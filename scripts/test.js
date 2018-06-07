@@ -1,126 +1,30 @@
-const _ = require('lodash'),
-    Promise = require('bluebird'),
-    cheerio = require('cheerio'),
-    request = require('request'),
-    winston = require('winston');
-
-winston.level = 'debug';
+var fs = require('fs');
+function TransferDate(timeStamp) {
+    return new Date(timeStamp*1000).toLocaleString();
+}
 
 
-const config = {
-    // URL of the site
-    source: 'http://scraping-challenge-2.herokuapp.com',
+var data = fs.readFileSync('../nba2k19_news.json', 'utf-8');
 
-    opts: {
-        // URL of Scrapoxy
-        proxy: 'http://ec2-34-243-245-61.eu-west-1.compute.amazonaws.com:8888',
+var newsArray = JSON.parse(data);
+newsArray = newsArray.map(function(news) {
+    
+    news.dateTime = TransferDate(Number(news.dateTime));
+    return news;
+});
 
-        // HTTPS over HTTP
-        tunnel: false,
-    },
+const writeFile = (data, cb) => {
+    fs.writeFile("./nba2k19_news_formatted.json", data ,cb);
 };
 
-
-// Get all URLs
-getProfilesUrls(config.source, config.opts)
-    .then((urls) => {
-        winston.info('Found %d profiles', urls.length);
-
-        winston.info('Wait 120 seconds to scale instances');
-
-        return urls;
-    })
-
-// Wait 2 minutes to scale instances
-.delay(2 * 60 * 1000)
-
-.then((urls) => {
-
-        // Get profiles one by one.
-        return Promise.map(urls,
-                (url) => getProfile(url, config.opts)
-                .then((profile) => {
-                    winston.debug('Found %s', profile.name);
-
-                    return profile;
-                })
-                .catch(() => {
-                    winston.debug('Cannot retrieve %s', url);
-                }), { concurrency: 1 })
-            .then((profiles) => {
-                const results = _.compact(profiles);
-
-                winston.info('Extract %d on %d profiles', results.length, urls.length);
-            });
-    })
-    .catch((err) => winston.error('Error: ', err));
+writeFile(JSON.stringify(newsArray), function (err) {
+    if (!err) {
+        console.log("文件写入成功！");
+    } else {
+        console.log("文件写入失败！");
+    }
+});
 
 
-////////////
 
-/**
- * Get all the urls of the profiles
- * @param url Main URL
- * @param defaultOpts options for http request
- * @returns {promise}
- */
-function getProfilesUrls(url, defaultOpts) {
-    return new Promise((resolve, reject) => {
-        // Create options for the HTTP request
-        // Add the URL to the default options
-        const opts = _.merge({}, defaultOpts, { url });
-        console.log(opts);
-        request(opts, (err, res, body) => {
-            if (err) {
-                return reject(err);
-            }
 
-            if (res.statusCode !== 200) {
-                return reject(body);
-            }
-
-            // Load content into a JQuery parser
-            const $ = cheerio.load(body);
-
-            // Extract all urls
-            const urls = $('.profile a')
-                .map((i, el) => $(el).attr('href'))
-                .get()
-                .map((url) => `${config.source}${url}`);
-
-            resolve(urls);
-        });
-    });
-}
-
-/**
- * Get the profile and extract the name
- * @param url URL of the profile
- * @param defaultOpts options for http request
- * @returns {promise}
- */
-function getProfile(url, defaultOpts) {
-    return new Promise((resolve, reject) => {
-        // Create options for the HTTP request
-        // Add the URL to the default options
-        const opts = _.merge({}, defaultOpts, { url });
-
-        request(opts, (err, res, body) => {
-            if (err) {
-                return reject(err);
-            }
-
-            if (res.statusCode !== 200) {
-                return reject(body);
-            }
-
-            // Load content into a JQuery parser
-            const $ = cheerio.load(body);
-
-            // Extract the names
-            const name = $('.profile-info-name').text();
-
-            resolve({ name });
-        });
-    });
-}

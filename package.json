@@ -15,7 +15,7 @@
     "lodash": "^4.17.4",
     "request": "^2.85.0",
     "request-promise": "^4.2.2",
-    "superagent": "^3.8.2",
+    "superagent": "^3.8.3",
     "winston": "^2.4.0"
   }
 }
